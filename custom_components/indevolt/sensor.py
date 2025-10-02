@@ -1,9 +1,17 @@
 import logging
 from homeassistant.components.sensor import SensorEntity
-from . import IndevoltDataUpdateCoordinator
+from .coordinator import IndevoltDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
+# Mapping-Tabellen für Enums
+ENUM_MAPPINGS = {
+    "6001": {1000: "Static", 1001: "Charging", 1002: "Discharging"},
+    "7101": {1: "Self-consumed prioritized", 5: "Charge/Discharge Schedule"},
+    "7120": {1000: "ON", 1001: "OFF"},
+    "47005": {1: "Self-consumed prioritized", 2: "Charge/Discharge Schedule", 4: "Real-time Control"},
+    "47015": {0: "Standby", 1: "Charging", 2: "Discharging"},
+}
 
 async def async_setup_entry(hass, entry, async_add_entities):
     """Set up Indevolt sensors dynamically from model JSON."""
@@ -46,8 +54,19 @@ class IndevoltSensor(SensorEntity):
 
     @property
     def native_value(self):
+        """Return the value of the sensor, applying enum mapping if needed."""
         val = self.coordinator.data.get(self._key)
-        _LOGGER.debug("Sensor %s (%s) -> %s", self._key, self._attr_name, val)
+
+        if val is None:
+            return None
+
+        # Enum-Mapping anwenden, falls vorhanden
+        if self._key in ENUM_MAPPINGS:
+            mapped = ENUM_MAPPINGS[self._key].get(val, val)
+            _LOGGER.debug("Sensor %s (%s) mapped value: %s -> %s", self._key, self._attr_name, val, mapped)
+            return mapped
+
+        _LOGGER.debug("Sensor %s (%s) raw value: %s", self._key, self._attr_name, val)
         return val
 
     @property
