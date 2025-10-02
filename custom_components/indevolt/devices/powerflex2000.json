@@ -35,20 +35,20 @@
     "47016": {"name": "Target Power", "platform": "number", "unit": "W", "min": 0, "max": 1200, "step": 10},
     "47017": {"name": "Target SOC", "platform": "number", "unit": "%", "min": 0, "max": 100, "step": 1},
     "grid_charge": {
-      "mode": {
-        "name": "Grid Charge Mode",
-        "platform": "select",
-        "enum": {
-          "1": "Charging",
-          "2": "Discharging"
-        }
-      },
-      "power": {
+      "charge": {
         "name": "Grid Charge Power",
         "platform": "number",
         "unit": "W",
         "min": 0,
         "max": 1200,
+        "step": 10
+      },
+      "discharge": {
+        "name": "Grid Discharge Power",
+        "platform": "number",
+        "unit": "W",
+        "min": 0,
+        "max": 800,
         "step": 10
       },
       "soc": {
@@ -62,3 +62,4 @@
     }
   }
 }
+``
