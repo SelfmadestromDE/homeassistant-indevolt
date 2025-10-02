@@ -1,4 +1,3 @@
-# custom_components/indevolt/client.py
 import asyncio
 import async_timeout
 import json
@@ -19,7 +18,14 @@ class IndevoltAPIError(Exception):
 class IndevoltClient:
     """Async client for Indevolt OpenData HTTP API (GetData / SetData)."""
 
-    def __init__(self, hass, host: str, port: int = DEFAULT_PORT, username: Optional[str] = None, password: Optional[str] = None):
+    def __init__(
+        self,
+        hass,
+        host: str,
+        port: int = DEFAULT_PORT,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
+    ):
         self.hass = hass
         self._host = host
         self._port = port
@@ -40,6 +46,7 @@ class IndevoltClient:
         return None
 
     async def async_getdata(self, points: List[int], timeout: int = 8) -> dict:
+        """Fetch multiple registers from the device."""
         if not points:
             return {}
         params = {"t": points}
@@ -49,15 +56,18 @@ class IndevoltClient:
             async with self._lock:
                 resp = await self._session.post(url, auth=auth)
                 text = await resp.text()
+                _LOGGER.debug("GetData request: %s", url)
+                _LOGGER.debug("GetData response (%s): %s", resp.status, text)
                 if resp.status >= 400:
                     raise IndevoltAPIError(f"GetData {resp.status}: {text}")
                 try:
-                    return await resp.json()
-                except Exception:
-                    _LOGGER.debug("GetData non-json response: %s", text)
+                    return json.loads(text)  # direkter JSON-Parser
+                except Exception as e:
+                    _LOGGER.error("Failed to decode JSON (%s): %s", e, text)
                     return {}
 
     async def async_setdata(self, t: int, v: List[Any], timeout: int = 8) -> bool:
+        """Write values to a register."""
         config = {"f": 16, "t": t, "v": v}
         url = f"{self._base_url()}/Indevolt.SetData?config={json.dumps(config)}"
         auth = await self._make_auth()
@@ -65,10 +75,12 @@ class IndevoltClient:
             async with self._lock:
                 resp = await self._session.post(url, auth=auth)
                 text = await resp.text()
+                _LOGGER.debug("SetData request: %s", url)
+                _LOGGER.debug("SetData response (%s): %s", resp.status, text)
                 if resp.status >= 400:
                     raise IndevoltAPIError(f"SetData {resp.status}: {text}")
                 try:
-                    j = await resp.json()
+                    j = json.loads(text)
                     return bool(j.get("result", False))
                 except Exception:
                     return "true" in text.lower()
