@@ -22,11 +22,6 @@ ICON_MAP = {
     "Total AC Input Power": "mdi:transmission-tower-import",
     "Total AC Input Energy": "mdi:transmission-tower",
     "Rated Capacity": "mdi:battery-high",
-    "Working Mode": "mdi:factory",
-    "Control Mode": "mdi:tune-variant",
-    "Control State": "mdi:state-machine",
-    "Target Power": "mdi:target",
-    "Target SOC": "mdi:battery-charging-100",
     "Meter Connection Status": "mdi:connection",
     "Meter Power": "mdi:home-lightning-bolt",
     "Bypass Power": "mdi:transmission-tower-export",
@@ -39,25 +34,8 @@ ICON_MAP = {
 
 # Enum-Mapping für hübsche Texte
 ENUM_MAP = {
-    "6001": {
-        1000: "Static",
-        1001: "Charging",
-        1002: "Discharging",
-    },
-    "7120": {
-        1000: "ON",
-        1001: "OFF",
-    },
-    "47005": {
-        1: "Self-consumed prioritized",
-        2: "Charge/discharge schedule",
-        4: "Real-time Control",
-    },
-    "47015": {
-        0: "Standby",
-        1: "Charging",
-        2: "Discharging",
-    },
+    "6001": {1000: "Static", 1001: "Charging", 1002: "Discharging"},
+    "7120": {1000: "ON", 1001: "OFF"},
 }
 
 
@@ -68,6 +46,10 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
     device_map = coordinator.device_map.get("entities", {})
     for key, meta in device_map.items():
+        # Steuerbare Register hier überspringen (landen später in select/number)
+        if key in ["7101", "47005", "47015", "47016", "47017"]:
+            continue
+
         entities.append(
             IndevoltSensor(
                 coordinator,
