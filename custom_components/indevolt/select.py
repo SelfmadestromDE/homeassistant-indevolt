@@ -2,46 +2,51 @@ import logging
 from homeassistant.components.select import SelectEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from . import DOMAIN
+from . import DOMAIN, IndevoltDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
+
 async def async_setup_entry(hass, entry, async_add_entities):
-    data = hass.data[DOMAIN][entry.entry_id]
-    coordinator = data["coordinator"]
-    client = data["client"]
-    device_map = data["device_map"]
-
+    """Set up Indevolt selects from config entry."""
+    coordinator: IndevoltDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
     entities = []
-    for e in device_map.get("entities", []):
-        if e.get("platform") == "select":
-            entities.append(IndevoltSelect(coordinator, client, entry.entry_id, e))
 
+    for key, meta in coordinator.device_map.get("entities", {}).items():
+        if meta.get("enum") and key in ["7101", "47005", "47015"]:
+            entities.append(
+                IndevoltSelect(
+                    coordinator,
+                    entry.entry_id,
+                    key,
+                    meta.get("name"),
+                    meta["enum"],
+                )
+            )
+
+    _LOGGER.debug("Adding %d Indevolt selects", len(entities))
     async_add_entities(entities)
 
+
 class IndevoltSelect(CoordinatorEntity, SelectEntity):
-    def __init__(self, coordinator, client, entry_id, definition: dict):
+    """Representation of an Indevolt select entity."""
+
+    def __init__(self, coordinator, entry_id, key, name, options):
         super().__init__(coordinator)
-        self._client = client
-        self._entry_id = entry_id
-        self._key = str(definition["t"])
-        self._options = definition.get("options", [])
-        self._attr_name = definition.get("name", f"Select {self._key}")
-        self._attr_unique_id = f"indevolt_{entry_id}_{self._key}"
-        self._attr_options = self._options
+        self._key = str(key)
+        self._attr_name = name
+        self._attr_unique_id = f"indevolt_{entry_id}_select_{key}"
+        self._options_map = {str(k): v for k, v in options.items()}
+        self._reverse_map = {v: int(k) for k, v in self._options_map.items()}
+        self._attr_options = list(self._options_map.values())
 
     @property
     def current_option(self):
-        val = self.coordinator.data.get(self._key)
-        if val is None:
-            return None
-        try:
-            return self._options[val]
-        except Exception:
-            return str(val)
+        raw = self.coordinator.data.get(self._key)
+        return self._options_map.get(str(raw), f"Unknown ({raw})")
 
     async def async_select_option(self, option: str):
-        if option in self._options:
-            idx = self._options.index(option)
-            await self._client.async_setdata(int(self._key), [idx])
+        value = self._reverse_map.get(option)
+        if value is not None:
+            await self.coordinator.client.async_setdata(int(self._key), [value])
             await self.coordinator.async_request_refresh()
