@@ -2,77 +2,87 @@ import logging
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from . import IndevoltDataUpdateCoordinator
+from . import DOMAIN, IndevoltDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
-# Enum mappings für lesbare Werte
-ENUM_MAPPINGS = {
-    "7101": {
-        1: "Self-consumed prioritized",
-        5: "Charge/Discharge Schedule"
-    },
+# Standard-Icons für verschiedene Kategorien
+ICON_MAP = {
+    "Battery SOC": "mdi:battery",
+    "Battery State": "mdi:battery-heart-variant",
+    "Battery Power": "mdi:flash",
+    "Battery Daily Charging Energy": "mdi:battery-plus",
+    "Battery Daily Discharging Energy": "mdi:battery-minus",
+    "Battery Total Charging Energy": "mdi:battery-plus-outline",
+    "Battery Total Discharging Energy": "mdi:battery-minus-outline",
+    "Daily Production": "mdi:solar-power",
+    "Cumulative Production": "mdi:chart-line",
+    "Total DC Output Power": "mdi:current-dc",
+    "Total AC Output Power": "mdi:current-ac",
+    "Total AC Input Power": "mdi:transmission-tower-import",
+    "Total AC Input Energy": "mdi:transmission-tower",
+    "Rated Capacity": "mdi:battery-high",
+    "Working Mode": "mdi:factory",
+    "Control Mode": "mdi:tune-variant",
+    "Control State": "mdi:state-machine",
+    "Target Power": "mdi:target",
+    "Target SOC": "mdi:battery-charging-100",
+    "Meter Connection Status": "mdi:connection",
+    "Meter Power": "mdi:home-lightning-bolt",
+    "Bypass Power": "mdi:transmission-tower-export",
+    "Emergency Power Supply": "mdi:alert-decagram",
+    "DC Input Power 1": "mdi:solar-panel",
+    "DC Input Power 2": "mdi:solar-panel",
+    "DC Input Power 3": "mdi:solar-panel",
+    "DC Input Power 4": "mdi:solar-panel",
+}
+
+# Enum-Mapping für hübsche Texte
+ENUM_MAP = {
     "6001": {
-        1000: "Idle",
+        1000: "Static",
         1001: "Charging",
-        1002: "Discharging"
+        1002: "Discharging",
     },
     "7120": {
         1000: "ON",
-        1001: "OFF"
+        1001: "OFF",
     },
     "47005": {
         1: "Self-consumed prioritized",
-        2: "Charge/Discharge Schedule",
-        4: "Real-time Control"
+        2: "Charge/discharge schedule",
+        4: "Real-time Control",
     },
     "47015": {
         0: "Standby",
         1: "Charging",
-        2: "Discharging"
-    }
-}
-
-# Optional: Icons je nach Enum-Status
-ENUM_ICONS = {
-    "6001": {
-        1000: "mdi:battery",
-        1001: "mdi:battery-arrow-up",
-        1002: "mdi:battery-arrow-down"
+        2: "Discharging",
     },
-    "7120": {
-        1000: "mdi:lan-connect",
-        1001: "mdi:lan-disconnect"
-    },
-    "47015": {
-        0: "mdi:power-standby",
-        1: "mdi:battery-arrow-up",
-        2: "mdi:battery-arrow-down"
-    }
 }
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
-    """Setup Indevolt sensors."""
-    coordinator: IndevoltDataUpdateCoordinator = hass.data["indevolt"][entry.entry_id]
+    """Set up Indevolt sensors from config entry."""
+    coordinator: IndevoltDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
+    entities = []
 
-    sensors = []
     device_map = coordinator.device_map.get("entities", {})
-
     for key, meta in device_map.items():
-        sensors.append(
+        entities.append(
             IndevoltSensor(
                 coordinator,
                 entry.entry_id,
                 key,
                 meta.get("name"),
                 meta.get("unit"),
-                meta.get("icon"),
+                ICON_MAP.get(meta.get("name")),
             )
         )
 
-    async_add_entities(sensors)
-    _LOGGER.debug("Added %s Indevolt sensors for model %s", len(sensors), coordinator.model)
+    _LOGGER.debug(
+        "Adding %d Indevolt sensors for model %s", len(entities), coordinator.model
+    )
+    async_add_entities(entities)
 
 
 class IndevoltSensor(CoordinatorEntity, SensorEntity):
@@ -80,28 +90,20 @@ class IndevoltSensor(CoordinatorEntity, SensorEntity):
 
     def __init__(self, coordinator, entry_id, key, name, unit, icon):
         super().__init__(coordinator)
-        self._key = key
-        self._attr_name = name or f"Indevolt {key}"
+        self._key = str(key)
+        self._attr_name = name
         self._attr_native_unit_of_measurement = unit
-        self._attr_icon = icon
         self._attr_unique_id = f"indevolt_{entry_id}_{key}"
+        self._attr_icon = icon
+        self._entry_id = entry_id
 
     @property
     def native_value(self):
-        value = self.coordinator.data.get(self._key)
+        """Return the sensor value."""
+        raw = self.coordinator.data.get(self._key)
 
-        # Enum-Mapping
-        if self._key in ENUM_MAPPINGS and value in ENUM_MAPPINGS[self._key]:
-            return ENUM_MAPPINGS[self._key][value]
+        # Wenn Enum → Mapping benutzen
+        if raw is not None and self._key in ENUM_MAP:
+            return ENUM_MAP[self._key].get(raw, f"Unknown ({raw})")
 
-        return value
-
-    @property
-    def icon(self):
-        value = self.coordinator.data.get(self._key)
-
-        # Icon abhängig vom Enum-Wert
-        if self._key in ENUM_ICONS and value in ENUM_ICONS[self._key]:
-            return ENUM_ICONS[self._key][value]
-
-        return self._attr_icon
+        return raw
