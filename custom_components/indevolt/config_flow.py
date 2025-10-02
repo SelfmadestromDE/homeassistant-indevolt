@@ -1,74 +1,45 @@
 import voluptuous as vol
-from homeassistant.config_entries import ConfigFlow
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from .const import DOMAIN, DEFAULT_PORT, DEFAULT_SCAN_INTERVAL, SUPPORTED_MODELS
-from .utils import get_device_gen
-import logging
-import asyncio
-from .coordinator import IndevoltAPI
+from homeassistant import config_entries
+from homeassistant.const import CONF_HOST, CONF_PORT, CONF_USERNAME, CONF_PASSWORD
+import homeassistant.helpers.config_validation as cv
 
-_LOGGER = logging.getLogger(__name__)
+from . import DOMAIN
 
-class IndevoltConfigFlow(ConfigFlow, domain=DOMAIN):
-    """Configuration flow for Indevolt integration."""
+DEVICE_MODELS = [
+    "powerflex2000",
+    "solidflex200",
+    "bk1600",
+    "bk1600ultra"
+]
 
+DEFAULT_PORT = 8080
+
+
+class IndevoltConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
     async def async_step_user(self, user_input=None):
-        """
-        Handle the initial user configuration step.
-        This method is called when the user initiates the integration setup.
-        It presents a form for device connection parameters and validates them.
-        """
-        
         errors = {}
+
         if user_input is not None:
-            host = user_input["host"]
-            port = user_input.get("port", DEFAULT_PORT)
-            scan_interval = user_input.get("scan_interval", DEFAULT_SCAN_INTERVAL)
-            device_model = user_input["device_model"]
+            # hier könnte man optional eine Testverbindung zum Gerät machen
+            return self.async_create_entry(
+                title=f"Indevolt {user_input[CONF_HOST]}",
+                data=user_input,
+            )
 
-            api = IndevoltAPI(host, port, async_get_clientsession(self.hass))
-
-            device_gen = get_device_gen(device_model)
-            
-
-            try:
-                fw_version=""
-                if device_gen == 1:
-                    fw_version="V1.3.0A_R006.072_M4848_00000039"
-                else:
-                    fw_version="V1.3.09_R00D.012_M4801_00000015"
-
-                data = await api.fetch_data([0])
-                device_sn = data.get("0")
-
-                # Create configuration entry on successful connection.
-                return self.async_create_entry(
-                    title=f"INDEVOLT {device_model} ({host})", # Entry title shown in HA UI.
-                    data={
-                        "host": host,
-                        "port": port,
-                        "scan_interval": scan_interval,
-                        "sn": device_sn,
-                        "device_model": device_model,
-                        "fw_version": fw_version
-                    }
-                )
-            
-            except asyncio.TimeoutError:
-                errors["base"] = "timeout"
-            except Exception as e:
-                _LOGGER.error("Unknown error occurred while verifying device: %s", str(e), exc_info=True)
-                errors["base"] = "unknown"
+        schema = vol.Schema(
+            {
+                vol.Required(CONF_HOST): str,
+                vol.Optional(CONF_PORT, default=DEFAULT_PORT): int,
+                vol.Required("device_model"): vol.In(DEVICE_MODELS),
+                vol.Optional(CONF_USERNAME): str,
+                vol.Optional(CONF_PASSWORD): str,
+            }
+        )
 
         return self.async_show_form(
             step_id="user",
-            data_schema=vol.Schema({
-                vol.Required("host"): str,
-                vol.Optional("port", default=DEFAULT_PORT): int,
-                vol.Optional("scan_interval", default=DEFAULT_SCAN_INTERVAL): int,
-                vol.Required("device_model"): vol.In(SUPPORTED_MODELS),
-            }),
-            errors=errors
+            data_schema=schema,
+            errors=errors,
         )
