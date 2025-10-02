@@ -22,12 +22,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     coordinator = IndevoltDataUpdateCoordinator(hass, client)
     await coordinator.async_config_entry_first_refresh()
 
-    # Add Grid Charge entities
+    # Add Grid Charge entities (separate for charging and discharging)
     async_add_entities([
-        GridChargeMode(coordinator, entry.entry_id),
-        GridChargePower(coordinator, entry.entry_id),
-        GridChargeSOC(coordinator, entry.entry_id),
-        ApplyGridChargeButton(coordinator, entry.entry_id)
+        GridChargePower(coordinator, entry.entry_id, mode="charge"),
+        GridChargePower(coordinator, entry.entry_id, mode="discharge"),
+        GridChargeSOC(coordinator, entry.entry_id)
     ])
     
     # Register coordinator for the entry
