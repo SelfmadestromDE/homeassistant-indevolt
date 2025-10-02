@@ -11,13 +11,9 @@ SENSOR_DEFINITIONS = {
     "1501": {"name": "Battery Voltage", "unit": "V"},
     "1502": {"name": "Battery Current", "unit": "A"},
     "2108": {"name": "Power Output", "unit": "W"},
-    "6000": {"name": "Power Generation", "unit": "W"},
-    "6001": {"name": "Load Power", "unit": "W"},
-    "6002": {"name": "Grid Power", "unit": "W"},
-    "47005": {"name": "Working Mode", "unit": None},
-    "47015": {"name": "Control State", "unit": None},
-    "47016": {"name": "Target Power", "unit": "W"},
-    "47017": {"name": "Target SOC", "unit": "%"}
+    "6000": {"name": "Battery Power", "unit": "W"},
+    "6001": {"name": "Battery Capacity", "unit": "Wh"},
+    "6002": {"name": "Battery Rated Capacity", "unit": "Wh"}
 }
 
 
@@ -41,3 +37,4 @@ async def async_setup_entry(hass, entry, async_add_entities):
     for key, meta in SENSOR_DEFINITIONS.items():
         entities.append(IndevoltSensor(coord, key, meta["name"], meta["unit"]))
     async_add_entities(entities, True)
+
