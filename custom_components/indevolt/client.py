@@ -41,23 +41,25 @@ class IndevoltClient:
         return None
 
     async def async_getdata(self, points: List[int], timeout: int = 8) -> dict:
-        """Fetch registers in one request; fix decimal commas before parsing."""
+        """Fetch registers with compact JSON (no spaces, fixes Indevolt parsing)."""
         if not points:
             return {}
         result = {}
         params = {"t": points}
-        url = f"{self._base_url()}/Indevolt.GetData?config={json.dumps(params)}"
+        # Kompaktes JSON ohne Leerzeichen (Indevolt mag keine Spaces)
+        config_str = json.dumps(params, separators=(',', ':'))
+        url = f"{self._base_url()}/Indevolt.GetData?config={config_str}"
         auth = await self._make_auth()
         async with async_timeout.timeout(timeout):
             async with self._lock:
                 resp = await self._session.post(url, auth=auth)
                 text = await resp.text()
                 _LOGGER.debug("GetData request: %s", url)
-                _LOGGER.debug("GetData response (%s): %s", resp.status, text)
+                _LOGGER.debug("GetData raw response (%s): %s", resp.status, text)
                 if resp.status >= 400:
                     raise IndevoltAPIError(f"GetData {resp.status}: {text}")
                 try:
-                    # Fix Dezimalkommas in Zahlen -> z.B. 1,96 → 1.96
+                    # Fix Dezimalkommas -> 1,96 → 1.96
                     fixed_text = re.sub(r'(\d+),(\d+)', r'\1.\2', text)
                     j = json.loads(fixed_text)
                     result.update(j)
@@ -67,9 +69,10 @@ class IndevoltClient:
         return result
 
     async def async_setdata(self, t: int, v: List[Any], timeout: int = 8) -> bool:
-        """Send a SetData command."""
+        """Send a SetData command with compact JSON."""
         config = {"f": 16, "t": t, "v": v}
-        url = f"{self._base_url()}/Indevolt.SetData?config={json.dumps(config)}"
+        config_str = json.dumps(config, separators=(',', ':'))
+        url = f"{self._base_url()}/Indevolt.SetData?config={config_str}"
         auth = await self._make_auth()
         async with async_timeout.timeout(timeout):
             async with self._lock:
