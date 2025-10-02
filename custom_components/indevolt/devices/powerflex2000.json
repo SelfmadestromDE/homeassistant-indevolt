@@ -1,5 +1,14 @@
 {
   "model": "powerflex2000",
   "read_points": [1664,1665,1501,1502,2108,6000,6001,6002],
-  "entities": []
+  "entities": [
+    {"t": 1664, "name": "Battery SOC", "unit": "%"},
+    {"t": 1665, "name": "Battery SOH", "unit": "%"},
+    {"t": 1501, "name": "Battery Voltage", "unit": "V"},
+    {"t": 1502, "name": "Battery Current", "unit": "A"},
+    {"t": 2108, "name": "Power Output", "unit": "W"},
+    {"t": 6000, "name": "Battery Power", "unit": "W"},
+    {"t": 6001, "name": "Battery Capacity", "unit": "Wh"},
+    {"t": 6002, "name": "Battery Rated Capacity", "unit": "Wh"}
+  ]
 }
