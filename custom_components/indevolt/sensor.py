@@ -1,95 +1,109 @@
 import logging
+from homeassistant.helpers.entity import Entity
+from homeassistant.components.select import SelectEntity
+from homeassistant.components.number import NumberEntity
+from homeassistant.components.button import ButtonEntity
 from homeassistant.components.sensor import SensorEntity
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
-
-from . import DOMAIN, IndevoltDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
-# Standard-Icons für verschiedene Kategorien
+# Define Icons for different sensors
 ICON_MAP = {
+    "Grid Charge Mode": "mdi:flash",
+    "Grid Charge Power": "mdi:flash-circle",
+    "Target SOC": "mdi:battery-charging-100",
     "Battery SOC": "mdi:battery",
     "Battery State": "mdi:battery-heart-variant",
     "Battery Power": "mdi:flash",
     "Battery Daily Charging Energy": "mdi:battery-plus",
     "Battery Daily Discharging Energy": "mdi:battery-minus",
-    "Battery Total Charging Energy": "mdi:battery-plus-outline",
-    "Battery Total Discharging Energy": "mdi:battery-minus-outline",
-    "Daily Production": "mdi:solar-power",
-    "Cumulative Production": "mdi:chart-line",
-    "Total DC Output Power": "mdi:current-dc",
-    "Total AC Output Power": "mdi:current-ac",
-    "Total AC Input Power": "mdi:transmission-tower-import",
-    "Total AC Input Energy": "mdi:transmission-tower",
-    "Rated Capacity": "mdi:battery-high",
-    "Working Mode": "mdi:factory",
-    "Control Mode": "mdi:tune-variant",
-    "Control State": "mdi:state-machine",
-    "Target Power": "mdi:target",
-    "Target SOC": "mdi:battery-charging-100",
-    "Meter Connection Status": "mdi:connection",
-    "Meter Power": "mdi:home-lightning-bolt",
-    "Bypass Power": "mdi:transmission-tower-export",
-    "Emergency Power Supply": "mdi:alert-decagram",
-    "DC Input Power 1": "mdi:solar-panel",
-    "DC Input Power 2": "mdi:solar-panel",
-    "DC Input Power 3": "mdi:solar-panel",
-    "DC Input Power 4": "mdi:solar-panel",
 }
 
-# Enum-Mapping für hübsche Texte
-ENUM_MAP = {
-    "6001": {
-        1000: "Idle",
-        1001: "Charging",
-        1002: "Discharging",
-    },
-    "7120": {
-        1000: "ON",
-        1001: "OFF",
-    },
-    "47005": {
-        1: "Self-consumed prioritized",
-        5: "Charge/Discharge Schedule",
-    },
-    "47015": {
-        0: "Standby",
-        1: "Charging",
-        2: "Discharging",
-    },
-}
+class GridChargeMode(SelectEntity):
+    """Grid Charge Mode (Charging/Discharging)"""
+    
+    def __init__(self, coordinator, entry_id):
+        self.coordinator = coordinator
+        self._entry_id = entry_id
+        self._attr_name = "Grid Charge Mode"
+        self._attr_options = ["Charging", "Discharging"]
 
+    @property
+    def current_option(self):
+        """Return the current option (charging or discharging)."""
+        return "Charging" if self.coordinator.data.get("mode", 1) == 1 else "Discharging"
 
-async def async_setup_entry(hass, entry, async_add_entities):
-    """Set up Indevolt sensors from config entry."""
-    coordinator: IndevoltDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
-    entities = []
+    async def async_select_option(self, option: str):
+        """Set the mode."""
+        mode = 1 if option == "Charging" else 2
+        await self.coordinator.client.set_data({"f": 16, "t": 47015, "v": [mode]})
 
-    device_map = coordinator.device_map.get("entities", {})
-    for key, meta in device_map.items():
-        entities.append(
-            IndevoltSensor(
-                coordinator,
-                entry.entry_id,
-                key,
-                meta.get("name"),
-                meta.get("unit"),
-                ICON_MAP.get(meta.get("name")),
-            )
-        )
+class GridChargePower(NumberEntity):
+    """Grid Charge Power (W)"""
+    
+    def __init__(self, coordinator, entry_id):
+        self.coordinator = coordinator
+        self._entry_id = entry_id
+        self._attr_name = "Grid Charge Power"
+        self._attr_unit_of_measurement = "W"
+        self._attr_min_value = 0
+        self._attr_max_value = 1200
+        self._attr_step = 10
 
-    _LOGGER.debug(
-        "Adding %d Indevolt sensors for model %s", len(entities), coordinator.model
-    )
-    async_add_entities(entities)
+    @property
+    def native_value(self):
+        """Return the power."""
+        return self.coordinator.data.get("power", 0)
 
+    async def async_set_native_value(self, value: int):
+        """Set the power."""
+        value = min(max(value, 0), 1200)
+        await self.coordinator.client.set_data({"f": 16, "t": 47016, "v": [value]})
 
-class IndevoltSensor(CoordinatorEntity, SensorEntity):
+class GridChargeSOC(NumberEntity):
+    """Target SOC (percentage)"""
+    
+    def __init__(self, coordinator, entry_id):
+        self.coordinator = coordinator
+        self._entry_id = entry_id
+        self._attr_name = "Target SOC"
+        self._attr_unit_of_measurement = "%"
+        self._attr_min_value = 0
+        self._attr_max_value = 100
+        self._attr_step = 1
+
+    @property
+    def native_value(self):
+        """Return the SOC value."""
+        return self.coordinator.data.get("soc", 100)
+
+    async def async_set_native_value(self, value: int):
+        """Set the SOC value."""
+        await self.coordinator.client.set_data({"f": 16, "t": 47017, "v": [value]})
+
+class ApplyGridChargeButton(ButtonEntity):
+    """Button to apply the grid charge settings."""
+    
+    def __init__(self, coordinator, entry_id):
+        self.coordinator = coordinator
+        self._entry_id = entry_id
+        self._attr_name = "Apply Grid Charge"
+
+    async def async_press(self):
+        """Trigger the grid charge apply action."""
+        mode = self.coordinator.data.get("mode", 1)
+        power = self.coordinator.data.get("power", 0)
+        soc = self.coordinator.data.get("soc", 100)
+        
+        # Send data to device
+        await self.coordinator.client.set_data({"f": 16, "t": 47015, "v": [mode, power, soc]})
+
+class IndevoltSensor(SensorEntity):
     """Representation of an Indevolt sensor."""
 
     def __init__(self, coordinator, entry_id, key, name, unit, icon):
-        super().__init__(coordinator)
-        self._key = str(key)
+        self.coordinator = coordinator
+        self._key = key
         self._attr_name = name
         self._attr_native_unit_of_measurement = unit
         self._attr_unique_id = f"indevolt_{entry_id}_{key}"
@@ -101,7 +115,7 @@ class IndevoltSensor(CoordinatorEntity, SensorEntity):
         """Return the sensor value."""
         raw = self.coordinator.data.get(self._key)
 
-        # Wenn Enum → Mapping benutzen
+        # If Enum → use the mapping
         if raw is not None and self._key in ENUM_MAP:
             return ENUM_MAP[self._key].get(raw, f"Unknown ({raw})")
 
