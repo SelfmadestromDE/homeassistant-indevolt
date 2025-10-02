@@ -1,5 +1,15 @@
 {
-  "model": "solidflex200",
-  "read_points": [1664,1665,1501,1502,2108,6000,6001,6002,47005,47015,47016,47017],
-  "entities": []
-}
+  "model": "solidflex2000",
+  "read_points": [1664,1665,1501,1502,2108,6000,6001,6002],
+  "entities": [
+    {"t": 1664, "name": "Battery SOC", "unit": "%", "platform": "sensor"},
+    {"t": 1665, "name": "Battery SOH", "unit": "%", "platform": "sensor"},
+    {"t": 1501, "name": "Battery Voltage", "unit": "V", "platform": "sensor"},
+    {"t": 1502, "name": "Battery Current", "unit": "A", "platform": "sensor"},
+    {"t": 2108, "name": "Power Output", "unit": "W", "platform": "sensor"},
+    {"t": 6000, "name": "Battery Power", "unit": "W", "platform": "sensor"},
+    {"t": 6001, "name": "Battery Capacity", "unit": "Wh", "platform": "sensor"},
+    {"t": 6002, "name": "Battery Rated Capacity", "unit": "Wh", "platform": "sensor"},
+
+    {"t": 47005, "name": "Operating Mode", "platform": "select", "options": ["Normal","ECO","Backup"]},
+    {"t": 47016, "name": "Target Power", "platform": "number", "min": 0, "max": 2000, "step": 50, "
