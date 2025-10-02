@@ -1,35 +1,41 @@
-# custom_components/indevolt/number.py
+import logging
 from homeassistant.components.number import NumberEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+
 from . import DOMAIN
 
+_LOGGER = logging.getLogger(__name__)
+
+async def async_setup_entry(hass, entry, async_add_entities):
+    data = hass.data[DOMAIN][entry.entry_id]
+    coordinator = data["coordinator"]
+    client = data["client"]
+    device_map = data["device_map"]
+
+    entities = []
+    for e in device_map.get("entities", []):
+        if e.get("platform") == "number":
+            entities.append(IndevoltNumber(coordinator, client, entry.entry_id, e))
+
+    async_add_entities(entities)
+
 class IndevoltNumber(CoordinatorEntity, NumberEntity):
-    def __init__(self, coordinator, client, name, key, t_register, min_v, max_v, step=1):
+    def __init__(self, coordinator, client, entry_id, definition: dict):
         super().__init__(coordinator)
-        self.client = client
-        self._attr_name = name
-        self._key = str(key)
-        self._t = t_register
-        self._attr_native_min_value = min_v
-        self._attr_native_max_value = max_v
-        self._attr_native_step = step
+        self._client = client
+        self._entry_id = entry_id
+        self._key = str(definition["t"])
+        self._attr_name = definition.get("name", f"Number {self._key}")
+        self._attr_unique_id = f"indevolt_{entry_id}_{self._key}"
+        self._attr_native_min_value = definition.get("min", 0)
+        self._attr_native_max_value = definition.get("max", 100)
+        self._attr_native_step = definition.get("step", 1)
+        self._attr_native_unit_of_measurement = definition.get("unit")
 
     @property
     def native_value(self):
-        val = self.coordinator.data.get(self._key)
-        return val
+        return self.coordinator.data.get(self._key)
 
     async def async_set_native_value(self, value: float):
-        await self.client.async_setdata(self._t, [int(value)])
+        await self._client.async_setdata(int(self._key), [value])
         await self.coordinator.async_request_refresh()
-
-async def async_setup_entry(hass, entry, async_add_entities):
-    inst = hass.data[DOMAIN][entry.entry_id]
-    coord = inst["coordinator"]
-    client = inst["client"]
-
-    entities = [
-        IndevoltNumber(coord, client, "Target SOC", 47017, 47017, 0, 100, 1),
-        IndevoltNumber(coord, client, "Target Power", 47016, 47016, 0, 1200, 10),
-    ]
-    async_add_entities(entities, True)
