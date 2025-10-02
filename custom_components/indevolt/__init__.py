@@ -1,7 +1,8 @@
 # custom_components/indevolt/__init__.py
 import logging
+import os
+import json
 from datetime import timedelta
-import json, os
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -17,7 +18,12 @@ PLATFORMS = ["sensor", "switch", "number", "select", "button"]
 
 class IndevoltCoordinator(DataUpdateCoordinator):
     def __init__(self, hass: HomeAssistant, client: IndevoltClient, read_points: list[int]):
-        super().__init__(hass, _LOGGER, name="indevolt", update_interval=timedelta(seconds=30))
+        super().__init__(
+            hass,
+            _LOGGER,
+            name="indevolt",
+            update_interval=timedelta(seconds=30),
+        )
         self.client = client
         self.read_points = read_points
 
@@ -29,22 +35,29 @@ class IndevoltCoordinator(DataUpdateCoordinator):
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
+    """Set up Indevolt integration from a config entry."""
     host = entry.data["host"]
-    model = entry.data.get("model")
+    port = entry.data.get("port", 8080)
+    model = entry.data.get("device_model", "").lower()
     username = entry.data.get("username")
     password = entry.data.get("password")
 
-    client = IndevoltClient(hass, host, username=username, password=password)
+    client = IndevoltClient(hass, host, port=port, username=username, password=password)
 
-    # load device map
+    # Lade die passende JSON-Definition für das Modell
     base_path = os.path.dirname(__file__)
-    device_file = os.path.join(base_path, "devices", f"{model.lower()}.json")
-    try:
-        with open(device_file, "r", encoding="utf-8") as f:
-            device_map = json.load(f)
-    except FileNotFoundError:
-        _LOGGER.warning("No device map for %s, using minimal", model)
+    device_file = os.path.join(base_path, "devices", f"{model}.json")
+
+    if not os.path.exists(device_file):
+        _LOGGER.warning("No device map for model '%s'. Using default minimal read points.", model)
         device_map = {"read_points": [1664, 1665], "entities": []}
+    else:
+        try:
+            with open(device_file, "r", encoding="utf-8") as f:
+                device_map = json.load(f)
+        except Exception as e:
+            _LOGGER.error("Failed to load device map %s: %s", device_file, e)
+            device_map = {"read_points": [1664, 1665], "entities": []}
 
     coordinator = IndevoltCoordinator(hass, client, device_map.get("read_points", []))
     await coordinator.async_config_entry_first_refresh()
@@ -57,3 +70,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
+
+
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
+    """Unload a config entry."""
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if unload_ok:
+        hass.data[DOMAIN].pop(entry.entry_id)
+    return unload_ok
