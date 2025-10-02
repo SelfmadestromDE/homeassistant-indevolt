@@ -1,77 +1,52 @@
 import logging
-import os
-import json
-from datetime import timedelta
-
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.helpers import discovery
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from homeassistant.components import select, number, button
+from homeassistant.const import CONF_HOST, CONF_PORT
 
 from .client import IndevoltClient
-
-DOMAIN = "indevolt"
-PLATFORMS = ["sensor", "select", "number"]
+from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
-
-class IndevoltDataUpdateCoordinator(DataUpdateCoordinator):
-    """Class to manage fetching Indevolt data."""
-
-    def __init__(self, hass: HomeAssistant, client: IndevoltClient, device_map: dict, scan_interval: int):
-        super().__init__(
-            hass,
-            _LOGGER,
-            name=DOMAIN,
-            update_interval=timedelta(seconds=scan_interval),
-        )
-        self.client = client
-        self.device_map = device_map
-        self.model = device_map.get("model", "unknown")
-
-    async def _async_update_data(self):
-        try:
-            points = self.device_map.get("read_points", [])
-            data = await self.client.async_getdata(points)
-            _LOGGER.debug("Coordinator fetched data: %s", data)
-            return data
-        except Exception as err:
-            raise UpdateFailed(f"Error fetching data: {err}") from err
-
-
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
-    """Set up Indevolt integration from a config entry."""
-    hass.data.setdefault(DOMAIN, {})
-
-    host = entry.data["host"]
-    port = entry.data.get("port", 8080)
-    username = entry.data.get("username")
-    password = entry.data.get("password")
-    model = entry.data.get("device_model", "powerflex2000")
-    scan_interval = entry.data.get("scan_interval", 30)
-
-    # Lade Gerätemap
-    dev_path = os.path.join(os.path.dirname(__file__), "devices", f"{model}.json")
-    try:
-        with open(dev_path, "r", encoding="utf-8") as f:
-            device_map = json.load(f)
-    except Exception as e:
-        _LOGGER.error("Failed to load device map %s: %s", dev_path, e)
-        device_map = {"model": model, "read_points": [], "entities": {}}
-
-    client = IndevoltClient(hass, host, port, username, password)
-    coordinator = IndevoltDataUpdateCoordinator(hass, client, device_map, scan_interval)
-
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities):
+    """Set up the Indevolt integration from a config entry."""
+    host = entry.data[CONF_HOST]
+    port = entry.data[CONF_PORT]
+    
+    client = IndevoltClient(hass, host, port)
+    
+    # Define coordinator and initialize it
+    coordinator = IndevoltDataUpdateCoordinator(hass, client)
     await coordinator.async_config_entry_first_refresh()
 
+    # Add Grid Charge entities
+    async_add_entities([
+        GridChargeMode(coordinator, entry.entry_id),
+        GridChargePower(coordinator, entry.entry_id),
+        GridChargeSOC(coordinator, entry.entry_id),
+        ApplyGridChargeButton(coordinator, entry.entry_id)
+    ])
+    
+    # Register coordinator for the entry
     hass.data[DOMAIN][entry.entry_id] = coordinator
 
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    return True
+class IndevoltDataUpdateCoordinator(DataUpdateCoordinator):
+    """Class to manage fetching data from the Indevolt device."""
 
+    def __init__(self, hass, client):
+        """Initialize the data coordinator."""
+        self.client = client
+        self.model = "powerflex2000"
+        super().__init__(hass, _LOGGER, name=DOMAIN, update_interval=timedelta(seconds=60))
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
-    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-    if unload_ok:
-        hass.data[DOMAIN].pop(entry.entry_id)
-    return unload_ok
+    async def _async_update_data(self):
+        """Fetch the data from the Indevolt API."""
+        try:
+            data = await self.client.async_getdata([1664, 1665, 1501, 1502, 2108, 6000, 6001, 6002])
+            return data
+        except Exception as e:
+            _LOGGER.error(f"Error fetching data: {e}")
+            return {}
