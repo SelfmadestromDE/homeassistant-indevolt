@@ -1,3 +1,4 @@
+# custom_components/indevolt/client.py
 import asyncio
 import async_timeout
 import json
@@ -18,14 +19,7 @@ class IndevoltAPIError(Exception):
 class IndevoltClient:
     """Async client for Indevolt OpenData HTTP API (GetData / SetData)."""
 
-    def __init__(
-        self,
-        hass,
-        host: str,
-        port: int = DEFAULT_PORT,
-        username: Optional[str] = None,
-        password: Optional[str] = None,
-    ):
+    def __init__(self, hass, host: str, port: int = DEFAULT_PORT, username: Optional[str] = None, password: Optional[str] = None):
         self.hass = hass
         self._host = host
         self._port = port
@@ -46,28 +40,33 @@ class IndevoltClient:
         return None
 
     async def async_getdata(self, points: List[int], timeout: int = 8) -> dict:
-        """Fetch multiple registers from the device."""
+        """Fetch registers one by one (some devices return {} if asked for too many)."""
         if not points:
             return {}
-        params = {"t": points}
-        url = f"{self._base_url()}/Indevolt.GetData?config={json.dumps(params)}"
+        result = {}
         auth = await self._make_auth()
         async with async_timeout.timeout(timeout):
             async with self._lock:
-                resp = await self._session.post(url, auth=auth)
-                text = await resp.text()
-                _LOGGER.debug("GetData request: %s", url)
-                _LOGGER.debug("GetData response (%s): %s", resp.status, text)
-                if resp.status >= 400:
-                    raise IndevoltAPIError(f"GetData {resp.status}: {text}")
-                try:
-                    return json.loads(text)  # direkter JSON-Parser
-                except Exception as e:
-                    _LOGGER.error("Failed to decode JSON (%s): %s", e, text)
-                    return {}
+                for p in points:
+                    url = f"{self._base_url()}/Indevolt.GetData?config={json.dumps({'t':[p]})}"
+                    try:
+                        resp = await self._session.post(url, auth=auth)
+                        text = await resp.text()
+                        _LOGGER.debug("GetData(%s) response (%s): %s", p, resp.status, text)
+                        if resp.status >= 400:
+                            raise IndevoltAPIError(f"GetData {resp.status}: {text}")
+                        try:
+                            j = json.loads(text)
+                            result.update(j)
+                        except Exception as e:
+                            _LOGGER.error("Failed to decode JSON for %s (%s): %s", p, e, text)
+                    except Exception as e:
+                        _LOGGER.error("GetData request for %s failed: %s", p, e)
+        _LOGGER.debug("Merged GetData result: %s", result)
+        return result
 
     async def async_setdata(self, t: int, v: List[Any], timeout: int = 8) -> bool:
-        """Write values to a register."""
+        """Send a SetData command."""
         config = {"f": 16, "t": t, "v": v}
         url = f"{self._base_url()}/Indevolt.SetData?config={json.dumps(config)}"
         auth = await self._make_auth()
@@ -75,8 +74,7 @@ class IndevoltClient:
             async with self._lock:
                 resp = await self._session.post(url, auth=auth)
                 text = await resp.text()
-                _LOGGER.debug("SetData request: %s", url)
-                _LOGGER.debug("SetData response (%s): %s", resp.status, text)
+                _LOGGER.debug("SetData(%s=%s) response (%s): %s", t, v, resp.status, text)
                 if resp.status >= 400:
                     raise IndevoltAPIError(f"SetData {resp.status}: {text}")
                 try:
@@ -87,7 +85,9 @@ class IndevoltClient:
 
     # Convenience wrappers
     async def async_set_mode(self, mode: int) -> bool:
+        """Set working mode (example register 47005)."""
         return await self.async_setdata(47005, [mode])
 
     async def async_set_state_power_soc(self, state: int, power: int, soc: int) -> bool:
+        """Set state, target power and target SOC (example registers)."""
         return await self.async_setdata(47015, [state, power, soc])
