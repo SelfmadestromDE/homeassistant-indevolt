@@ -1,69 +1,59 @@
-from __future__ import annotations
-
-"""Home Assistant integration for indevolt device."""
-
+# custom_components/indevolt/__init__.py
 import logging
-from typing import Any
+from datetime import timedelta
+import json, os
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryNotReady
-from .const import DOMAIN, PLATFORMS
-from .coordinator import IndevoltCoordinator
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+
+from .client import IndevoltClient
 
 _LOGGER = logging.getLogger(__name__)
+DOMAIN = "indevolt"
 
-async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
-    """
-    Set up the indevolt integration component.
-    This function is called when the integration is added to the Home Assistant configuration.
-    No component-level setup needed.
-    """
-    return True
+PLATFORMS = ["sensor", "switch", "number", "select", "button"]
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """
-    Set up indevolt from a config entry.
-    This is the main setup function called when a config entry is added.
-    It initializes the coordinator and sets up platforms.
-    """
-    hass.data.setdefault(DOMAIN, {})
-    
+
+class IndevoltCoordinator(DataUpdateCoordinator):
+    def __init__(self, hass: HomeAssistant, client: IndevoltClient, read_points: list[int]):
+        super().__init__(hass, _LOGGER, name="indevolt", update_interval=timedelta(seconds=30))
+        self.client = client
+        self.read_points = read_points
+
+    async def _async_update_data(self):
+        try:
+            return await self.client.async_getdata(self.read_points)
+        except Exception as err:
+            raise UpdateFailed(err) from err
+
+
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
+    host = entry.data["host"]
+    model = entry.data.get("model")
+    username = entry.data.get("username")
+    password = entry.data.get("password")
+
+    client = IndevoltClient(hass, host, username=username, password=password)
+
+    # load device map
+    base_path = os.path.dirname(__file__)
+    device_file = os.path.join(base_path, "devices", f"{model.lower()}.json")
     try:
-        coordinator = IndevoltCoordinator(hass, entry.data)
-        # Perform initial data refresh.
-        await coordinator.async_config_entry_first_refresh()
-        # Store coordinator in hass.data for platform access.
-        hass.data[DOMAIN][entry.entry_id] = coordinator
-        # Set up all platforms (sensors, switches, etc.).
-        await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-        return True 
-    
-    except Exception as err:
-        _LOGGER.exception("Unexpected error occurred while setting config entry.")
-        
-        # Clean up partially created resources.
-        if entry.entry_id in hass.data.get(DOMAIN, {}):
-            del hass.data[DOMAIN][entry.entry_id]
-        
-        raise ConfigEntryNotReady from err
+        with open(device_file, "r", encoding="utf-8") as f:
+            device_map = json.load(f)
+    except FileNotFoundError:
+        _LOGGER.warning("No device map for %s, using minimal", model)
+        device_map = {"read_points": [1664, 1665], "entities": []}
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """
-    Unload a config entry and clean up resources.
-    This is called when the integration is removed or reloaded.
-    """
-    if DOMAIN not in hass.data or entry.entry_id not in hass.data[DOMAIN]:
-        _LOGGER.debug("Config entry %s not loaded or already unloaded", entry.entry_id)
-        return True
-    
-    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-    
-    if unload_ok:
-        coordinator = hass.data[DOMAIN].pop(entry.entry_id)
-        await coordinator.async_shutdown()
-        
-        if not hass.data[DOMAIN]:
-            hass.data.pop(DOMAIN)
-    
-    return unload_ok
+    coordinator = IndevoltCoordinator(hass, client, device_map.get("read_points", []))
+    await coordinator.async_config_entry_first_refresh()
+
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
+        "client": client,
+        "device_map": device_map,
+        "coordinator": coordinator,
+    }
+
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    return True
