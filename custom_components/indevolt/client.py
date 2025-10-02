@@ -3,6 +3,7 @@ import asyncio
 import async_timeout
 import json
 import logging
+import re
 from typing import Any, List, Optional
 
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -40,29 +41,29 @@ class IndevoltClient:
         return None
 
     async def async_getdata(self, points: List[int], timeout: int = 8) -> dict:
-        """Fetch registers one by one (some devices return {} if asked for too many)."""
+        """Fetch registers in one request; fix decimal commas before parsing."""
         if not points:
             return {}
         result = {}
+        params = {"t": points}
+        url = f"{self._base_url()}/Indevolt.GetData?config={json.dumps(params)}"
         auth = await self._make_auth()
         async with async_timeout.timeout(timeout):
             async with self._lock:
-                for p in points:
-                    url = f"{self._base_url()}/Indevolt.GetData?config={json.dumps({'t':[p]})}"
-                    try:
-                        resp = await self._session.post(url, auth=auth)
-                        text = await resp.text()
-                        _LOGGER.debug("GetData(%s) response (%s): %s", p, resp.status, text)
-                        if resp.status >= 400:
-                            raise IndevoltAPIError(f"GetData {resp.status}: {text}")
-                        try:
-                            j = json.loads(text)
-                            result.update(j)
-                        except Exception as e:
-                            _LOGGER.error("Failed to decode JSON for %s (%s): %s", p, e, text)
-                    except Exception as e:
-                        _LOGGER.error("GetData request for %s failed: %s", p, e)
-        _LOGGER.debug("Merged GetData result: %s", result)
+                resp = await self._session.post(url, auth=auth)
+                text = await resp.text()
+                _LOGGER.debug("GetData request: %s", url)
+                _LOGGER.debug("GetData response (%s): %s", resp.status, text)
+                if resp.status >= 400:
+                    raise IndevoltAPIError(f"GetData {resp.status}: {text}")
+                try:
+                    # Fix Dezimalkommas in Zahlen -> z.B. 1,96 → 1.96
+                    fixed_text = re.sub(r'(\d+),(\d+)', r'\1.\2', text)
+                    j = json.loads(fixed_text)
+                    result.update(j)
+                except Exception as e:
+                    _LOGGER.error("Failed to decode JSON (%s): %s", e, text)
+        _LOGGER.debug("Parsed GetData result: %s", result)
         return result
 
     async def async_setdata(self, t: int, v: List[Any], timeout: int = 8) -> bool:
