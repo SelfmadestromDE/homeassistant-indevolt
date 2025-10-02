@@ -1,3 +1,4 @@
+# custom_components/indevolt/__init__.py
 import logging
 import os
 import json
@@ -11,7 +12,6 @@ from .client import IndevoltClient
 
 _LOGGER = logging.getLogger(__name__)
 DOMAIN = "indevolt"
-
 PLATFORMS = ["sensor", "switch", "number", "select", "button"]
 
 
@@ -33,6 +33,15 @@ class IndevoltCoordinator(DataUpdateCoordinator):
             raise UpdateFailed(err) from err
 
 
+def _load_json_file(path: str) -> dict:
+    """Synchron reading of JSON file (helper to run in executor)."""
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     """Set up Indevolt integration from a config entry."""
     host = entry.data["host"]
@@ -42,26 +51,25 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     username = entry.data.get("username")
     password = entry.data.get("password")
 
-    # Nur bei Digest Username/Passwort weiterreichen
     if protocol == "http_digest":
         client = IndevoltClient(hass, host, port=port, username=username, password=password)
     else:
         client = IndevoltClient(hass, host, port=port)
 
-    # Lade JSON
+    # JSON-Datei im Executor laden (um Blockieren des Eventloops zu vermeiden)
     base_path = os.path.dirname(__file__)
     device_file = os.path.join(base_path, "devices", f"{model}.json")
 
-    if not os.path.exists(device_file):
-        _LOGGER.warning("No device map for model '%s'. Using default minimal read points.", model)
-        device_map = {"read_points": [1664, 1665], "entities": []}
+    # Lade JSON asynchron
+    device_map = {"read_points": [1664, 1665], "entities": []}
+    if os.path.exists(device_file):
+        loaded = await hass.async_add_executor_job(_load_json_file, device_file)
+        if loaded:
+            device_map = loaded
+        else:
+            _LOGGER.error("Failed to load device map %s", device_file)
     else:
-        try:
-            with open(device_file, "r", encoding="utf-8") as f:
-                device_map = json.load(f)
-        except Exception as e:
-            _LOGGER.error("Failed to load device map %s: %s", device_file, e)
-            device_map = {"read_points": [1664, 1665], "entities": []}
+        _LOGGER.warning("No device map for model '%s'. Using default minimal read points.", model)
 
     coordinator = IndevoltCoordinator(hass, client, device_map.get("read_points", []))
     await coordinator.async_config_entry_first_refresh()
