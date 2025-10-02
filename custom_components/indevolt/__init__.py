@@ -1,4 +1,3 @@
-# custom_components/indevolt/__init__.py
 import logging
 import os
 import json
@@ -39,12 +38,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     host = entry.data["host"]
     port = entry.data.get("port", 8080)
     model = entry.data.get("device_model", "").lower()
+    protocol = entry.data.get("protocol", "http")
     username = entry.data.get("username")
     password = entry.data.get("password")
 
-    client = IndevoltClient(hass, host, port=port, username=username, password=password)
+    # Nur bei Digest Username/Passwort weiterreichen
+    if protocol == "http_digest":
+        client = IndevoltClient(hass, host, port=port, username=username, password=password)
+    else:
+        client = IndevoltClient(hass, host, port=port)
 
-    # Lade die passende JSON-Definition für das Modell
+    # Lade JSON
     base_path = os.path.dirname(__file__)
     device_file = os.path.join(base_path, "devices", f"{model}.json")
 
@@ -73,7 +77,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
-    """Unload a config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
         hass.data[DOMAIN].pop(entry.entry_id)
