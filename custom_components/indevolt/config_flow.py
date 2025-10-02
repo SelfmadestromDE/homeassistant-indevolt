@@ -7,7 +7,7 @@ from . import DOMAIN
 
 DEVICE_MODELS = [
     "powerflex2000",
-    "solidflex200",
+    "solidflex2000",
     "bk1600",
     "bk1600ultra"
 ]
@@ -43,3 +43,4 @@ class IndevoltConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data_schema=schema,
             errors=errors,
         )
+
