@@ -1,5 +1,15 @@
 {
   "model": "bk1600",
-  "read_points": [1664,1665,1501,1502,2108,6000,6001,6002,47005,47015,47016,47017],
-  "entities": []
+  "read_points": [1664,1665,1501,2108,6000,6001],
+  "entities": [
+    {"t": 1664, "name": "Battery SOC", "unit": "%", "platform": "sensor"},
+    {"t": 1665, "name": "Battery SOH", "unit": "%", "platform": "sensor"},
+    {"t": 1501, "name": "Battery Voltage", "unit": "V", "platform": "sensor"},
+    {"t": 2108, "name": "Power Output", "unit": "W", "platform": "sensor"},
+    {"t": 6000, "name": "Battery Power", "unit": "W", "platform": "sensor"},
+    {"t": 6001, "name": "Battery Capacity", "unit": "Wh", "platform": "sensor"},
+
+    {"t": 47015, "name": "Enable Output", "platform": "switch"},
+    {"t": 47017, "name": "Target SOC", "platform": "number", "min": 20, "max": 100, "step": 5, "unit": "%"}
+  ]
 }
