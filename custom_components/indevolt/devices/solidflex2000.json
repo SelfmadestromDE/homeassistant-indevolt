@@ -1,15 +1,44 @@
 {
   "model": "solidflex2000",
-  "read_points": [1664,1665,1501,1502,2108,6000,6001,6002],
-  "entities": [
-    {"t": 1664, "name": "Battery SOC", "unit": "%", "platform": "sensor"},
-    {"t": 1665, "name": "Battery SOH", "unit": "%", "platform": "sensor"},
-    {"t": 1501, "name": "Battery Voltage", "unit": "V", "platform": "sensor"},
-    {"t": 1502, "name": "Battery Current", "unit": "A", "platform": "sensor"},
-    {"t": 2108, "name": "Power Output", "unit": "W", "platform": "sensor"},
-    {"t": 6000, "name": "Battery Power", "unit": "W", "platform": "sensor"},
-    {"t": 6001, "name": "Battery Capacity", "unit": "Wh", "platform": "sensor"},
-    {"t": 6002, "name": "Battery Rated Capacity", "unit": "Wh", "platform": "sensor"},
-
-    {"t": 47005, "name": "Operating Mode", "platform": "select", "options": ["Normal","ECO","Backup"]},
-    {"t": 47016, "name": "Target Power", "platform": "number", "min": 0, "max": 2000, "step": 50, "
+  "read_points": [
+    7101,
+    1664,1665,1666,1667,
+    1501,1502,1505,
+    2101,2107,2108,
+    142,
+    6000,6001,6002,6004,6005,6006,6007,6105,
+    7120,
+    11016,
+    667,
+    47005,47015,47016,47017
+  ],
+  "entities": {
+    "7101":   {"name": "Working Mode", "unit": null},
+    "1664":   {"name": "DC Input Power 1", "unit": "W"},
+    "1665":   {"name": "DC Input Power 2", "unit": "W"},
+    "1666":   {"name": "DC Input Power 3", "unit": "W"},
+    "1667":   {"name": "DC Input Power 4", "unit": "W"},
+    "1501":   {"name": "Total DC Output Power", "unit": "W"},
+    "2108":   {"name": "Total AC Output Power", "unit": "W"},
+    "1502":   {"name": "Daily Production", "unit": "kWh"},
+    "1505":   {"name": "Cumulative Production", "unit": "kWh"},
+    "2101":   {"name": "Total AC Input Power", "unit": "W"},
+    "2107":   {"name": "Total AC Input Energy", "unit": "kWh"},
+    "142":    {"name": "Rated Capacity", "unit": "kWh"},
+    "6000":   {"name": "Battery Power", "unit": "W"},
+    "6001":   {"name": "Battery State", "unit": null},
+    "6002":   {"name": "Battery SOC", "unit": "%"},
+    "6105":   {"name": "Emergency Power Supply", "unit": "%"},
+    "6004":   {"name": "Battery Daily Charging Energy", "unit": "kWh"},
+    "6005":   {"name": "Battery Daily Discharging Energy", "unit": "kWh"},
+    "6006":   {"name": "Battery Total Charging Energy", "unit": "kWh"},
+    "6007":   {"name": "Battery Total Discharging Energy", "unit": "kWh"},
+    "7120":   {"name": "Meter Connection Status", "unit": null},
+    "11016":  {"name": "Meter Power", "unit": "W"},
+    "667":    {"name": "Bypass Power", "unit": "W"},
+    "47005":  {"name": "Control Mode", "unit": null},
+    "47015":  {"name": "Control State", "unit": null},
+    "47016":  {"name": "Target Power", "unit": "W"},
+    "47017":  {"name": "Target SOC", "unit": "%"}
+  }
+}
