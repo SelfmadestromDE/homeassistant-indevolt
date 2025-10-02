@@ -1,4 +1,3 @@
-# custom_components/indevolt/__init__.py
 import logging
 import os
 import json
@@ -28,8 +27,11 @@ class IndevoltCoordinator(DataUpdateCoordinator):
 
     async def _async_update_data(self):
         try:
-            return await self.client.async_getdata(self.read_points)
+            data = await self.client.async_getdata(self.read_points)
+            _LOGGER.debug("Coordinator fetched data: %s", data)
+            return data
         except Exception as err:
+            _LOGGER.error("Coordinator update failed: %s", err)
             raise UpdateFailed(err) from err
 
 
@@ -38,7 +40,8 @@ def _load_json_file(path: str) -> dict:
     try:
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
-    except Exception:
+    except Exception as e:
+        _LOGGER.error("Error reading JSON file %s: %s", path, e)
         return {}
 
 
@@ -60,7 +63,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     base_path = os.path.dirname(__file__)
     device_file = os.path.join(base_path, "devices", f"{model}.json")
 
-    # Lade JSON asynchron
     device_map = {"read_points": [1664, 1665], "entities": []}
     if os.path.exists(device_file):
         loaded = await hass.async_add_executor_job(_load_json_file, device_file)
@@ -73,6 +75,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
     coordinator = IndevoltCoordinator(hass, client, device_map.get("read_points", []))
     await coordinator.async_config_entry_first_refresh()
+
+    # Debug-Log: zeige initiale Daten aus dem Gerät
+    _LOGGER.debug("Initial coordinator data for model %s: %s", model, coordinator.data)
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
         "client": client,
