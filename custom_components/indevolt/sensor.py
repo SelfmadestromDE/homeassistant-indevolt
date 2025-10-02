@@ -1,9 +1,7 @@
 import logging
 from homeassistant.helpers.entity import Entity
-from homeassistant.components.select import SelectEntity
 from homeassistant.components.number import NumberEntity
 from homeassistant.components.button import ButtonEntity
-from homeassistant.components.sensor import SensorEntity
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -17,47 +15,51 @@ ICON_MAP = {
     "Battery Power": "mdi:flash",
     "Battery Daily Charging Energy": "mdi:battery-plus",
     "Battery Daily Discharging Energy": "mdi:battery-minus",
+    "Daily Production": "mdi:solar-power",
+    "Cumulative Production": "mdi:chart-line",
+    "Total DC Output Power": "mdi:current-dc",
+    "Total AC Output Power": "mdi:current-ac",
+    "Total AC Input Power": "mdi:transmission-tower-import",
+    "Total AC Input Energy": "mdi:transmission-tower",
+    "Rated Capacity": "mdi:battery-high",
+    "Working Mode": "mdi:factory",
+    "Control Mode": "mdi:tune-variant",
+    "Control State": "mdi:state-machine",
+    "Target Power": "mdi:target",
+    "Target SOC": "mdi:battery-charging-100",
+    "Meter Connection Status": "mdi:connection",
+    "Meter Power": "mdi:home-lightning-bolt",
+    "Bypass Power": "mdi:transmission-tower-export",
+    "Emergency Power Supply": "mdi:alert-decagram",
+    "DC Input Power 1": "mdi:solar-panel",
+    "DC Input Power 2": "mdi:solar-panel",
+    "DC Input Power 3": "mdi:solar-panel",
+    "DC Input Power 4": "mdi:solar-panel",
 }
 
-class GridChargeMode(SelectEntity):
-    """Grid Charge Mode (Charging/Discharging)"""
-    
-    def __init__(self, coordinator, entry_id):
-        self.coordinator = coordinator
-        self._entry_id = entry_id
-        self._attr_name = "Grid Charge Mode"
-        self._attr_options = ["Charging", "Discharging"]
-
-    @property
-    def current_option(self):
-        """Return the current option (charging or discharging)."""
-        return "Charging" if self.coordinator.data.get("mode", 1) == 1 else "Discharging"
-
-    async def async_select_option(self, option: str):
-        """Set the mode."""
-        mode = 1 if option == "Charging" else 2
-        await self.coordinator.client.set_data({"f": 16, "t": 47015, "v": [mode]})
-
 class GridChargePower(NumberEntity):
-    """Grid Charge Power (W)"""
+    """Grid Charge Power or Discharge Power (W)"""
     
-    def __init__(self, coordinator, entry_id):
+    def __init__(self, coordinator, entry_id, mode):
         self.coordinator = coordinator
         self._entry_id = entry_id
-        self._attr_name = "Grid Charge Power"
+        self._mode = mode
+        self._attr_name = f"Grid {mode.capitalize()} Power"
         self._attr_unit_of_measurement = "W"
+        
+        # Max Power depending on mode
+        self._attr_max_value = 1200 if mode == "charge" else 800
         self._attr_min_value = 0
-        self._attr_max_value = 1200
         self._attr_step = 10
 
     @property
     def native_value(self):
         """Return the power."""
-        return self.coordinator.data.get("power", 0)
+        return self.coordinator.data.get(f"grid_charge_{self._mode}", 0)
 
     async def async_set_native_value(self, value: int):
         """Set the power."""
-        value = min(max(value, 0), 1200)
+        value = min(max(value, 0), self._attr_max_value)
         await self.coordinator.client.set_data({"f": 16, "t": 47016, "v": [value]})
 
 class GridChargeSOC(NumberEntity):
