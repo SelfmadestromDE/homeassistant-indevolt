@@ -4,10 +4,9 @@
     7101,1664,1665,1666,1667,1501,1502,1505,
     2101,2107,2108,142,6000,6001,6002,6105,
     6004,6005,6006,6007,7120,11016,667,
-    47005,47015,47016,47017
+    47016,47017
   ],
   "entities": {
-    "7101": {"name": "Working Mode", "unit": null, "enum": {"1": "Self-consumed prioritized", "5": "Charge/Discharge Schedule"}},
     "1664": {"name": "DC Input Power 1", "unit": "W"},
     "1665": {"name": "DC Input Power 2", "unit": "W"},
     "1666": {"name": "DC Input Power 3", "unit": "W"},
@@ -20,19 +19,64 @@
     "2107": {"name": "Total AC Input Energy", "unit": "kWh"},
     "142": {"name": "Rated Capacity", "unit": "kWh"},
     "6000": {"name": "Battery Power", "unit": "W"},
-    "6001": {"name": "Battery State", "unit": null, "enum": {"1000": "Static", "1001": "Charging", "1002": "Discharging"}},
+    "6001": {
+      "name": "Battery State",
+      "unit": null,
+      "enum": {
+        "1000": "Idle",
+        "1001": "Charging",
+        "1002": "Discharging"
+      }
+    },
     "6002": {"name": "Battery SOC", "unit": "%"},
-    "6105": {"name": "Emergency Power Supply", "unit": "%"},
+    "6105": {
+      "name": "Emergency Power Supply",
+      "unit": "%",
+      "writable": true,
+      "min": 5,
+      "max": 100,
+      "step": 1
+    },
     "6004": {"name": "Battery Daily Charging Energy", "unit": "kWh"},
     "6005": {"name": "Battery Daily Discharging Energy", "unit": "kWh"},
     "6006": {"name": "Battery Total Charging Energy", "unit": "kWh"},
     "6007": {"name": "Battery Total Discharging Energy", "unit": "kWh"},
-    "7120": {"name": "Meter Connection Status", "unit": null, "enum": {"1000": "ON", "1001": "OFF"}},
+    "7120": {
+      "name": "Meter Connection Status",
+      "unit": null,
+      "enum": {
+        "1000": "ON",
+        "1001": "OFF"
+      }
+    },
     "11016": {"name": "Meter Power", "unit": "W"},
     "667": {"name": "Bypass Power", "unit": "W"},
-    "47005": {"name": "Control Mode", "unit": null, "enum": {"1": "Self-consumed prioritized", "2": "Charge/Discharge Schedule", "4": "Real-time Control"}},
-    "47015": {"name": "Control State", "unit": null, "enum": {"0": "Standby", "1": "Charging", "2": "Discharging"}},
-    "47016": {"name": "Target Power", "unit": "W"},
-    "47017": {"name": "Target SOC", "unit": "%"}
+    "7101": {
+      "name": "Working Mode",
+      "unit": null,
+      "enum": {
+        "1": "Self-consumed prioritized",
+        "2": "Charge/Discharge Schedule",
+        "4": "Real-time Control",
+        "5": "Other"
+      },
+      "writable": true
+    },
+    "47016": {
+      "name": "Target Power",
+      "unit": "W",
+      "writable": true,
+      "min": -800,
+      "max": 1200,
+      "step": 1
+    },
+    "47017": {
+      "name": "Target SOC",
+      "unit": "%",
+      "writable": true,
+      "min": 0,
+      "max": 100,
+      "step": 1
+    }
   }
 }
